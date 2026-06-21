@@ -1,0 +1,24 @@
+# Environment / secrets
+.env
+.env.*
+*.local
+
+# Generated database code
+/internal/db/*.go
+
+# Local Redis persistence
+dump.rdb
+*.rdb
+appendonly.aof
+
+# Go build/test outputs
+/bin/
+*.test
+*.out
+coverage.out
+.coverprofile
+
+# Editor / OS files
+.DS_Store
+.idea/
+.vscode/
