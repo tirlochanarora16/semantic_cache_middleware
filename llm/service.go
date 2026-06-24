@@ -64,7 +64,7 @@ func (s *ClientService) RunAllServices(ctx context.Context) {
 		return
 	}
 
-	err = database.SaveEmbeddingToDBb(ctx, chatCompletion, vector)
+	err = database.SaveEmbeddingToDBb(ctx, chatCompletion, vector, input)
 
 	if err != nil {
 		log.Fatalf("Error storing the response to Redis %v", err)

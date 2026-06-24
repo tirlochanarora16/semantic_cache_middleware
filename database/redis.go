@@ -126,7 +126,7 @@ func DoVectorSearch(ctx context.Context, vectorBytes []byte) (*VectorSearchResul
 	return out, nil
 }
 
-func SaveEmbeddingToDBb(ctx context.Context, chatCompletion *openai.ChatCompletion, vector []float64) error {
+func SaveEmbeddingToDBb(ctx context.Context, chatCompletion *openai.ChatCompletion, vector []float64, userInput string) error {
 	// float64 -> float32
 	vec32 := make([]float32, len(vector))
 	for i, v := range vector {
@@ -142,6 +142,7 @@ func SaveEmbeddingToDBb(ctx context.Context, chatCompletion *openai.ChatCompleti
 	response := chatCompletion.Choices[0].Message.Content
 
 	_, err := redisClient.HSet(ctx, "cache:"+uuid.NewString(), map[string]interface{}{
+		"prompt":     userInput,
 		"response":   response,
 		"embedding":  vecBytes,
 		"created_at": time.Now().Unix(),
