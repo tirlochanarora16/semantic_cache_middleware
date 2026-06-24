@@ -17,6 +17,8 @@ type ClientService struct {
 	client *openai.Client
 }
 
+const similarityThreshold = 0.08
+
 func NewClientService(client *openai.Client) *ClientService {
 	return &ClientService{
 		client: client,
@@ -48,7 +50,7 @@ func (s *ClientService) RunAllServices(ctx context.Context) {
 		return
 	}
 
-	if searchResp.Found {
+	if searchResp.Found && searchResp.Score <= similarityThreshold {
 		// get the response from the Redis DB
 		fmt.Println(searchResp.Response)
 		return
