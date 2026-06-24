@@ -24,6 +24,19 @@ type VectorSearchResult struct {
 	Found    bool
 }
 
+func CheckRedisStack(ctx context.Context) error {
+	if redisClient == nil {
+		return fmt.Errorf("Redis client is not initalized")
+	}
+
+	// FT._LIST only exists when the Redis Search module is loaded.
+	if _, err := redisClient.Do(ctx, "FT._LIST").Result(); err != nil {
+		return fmt.Errorf("Redis Search module is unavailable: %w", err)
+	}
+
+	return nil
+}
+
 func InitializeRedisDB() error {
 	client := redis.NewClient(&redis.Options{
 		Addr:     os.Getenv("REDIS_URL"),
@@ -126,7 +139,7 @@ func DoVectorSearch(ctx context.Context, vectorBytes []byte) (*VectorSearchResul
 	return out, nil
 }
 
-func SaveEmbeddingToDBb(ctx context.Context, chatCompletion *openai.ChatCompletion, vector []float64, userInput string) error {
+func SaveEmbeddingToRedis(ctx context.Context, chatCompletion *openai.ChatCompletion, vector []float64, userInput string) error {
 	// float64 -> float32
 	vec32 := make([]float32, len(vector))
 	for i, v := range vector {

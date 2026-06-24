@@ -66,14 +66,14 @@ func (s *ClientService) RunAllServices(ctx context.Context) {
 		return
 	}
 
-	err = database.SaveEmbeddingToDBb(ctx, chatCompletion, vector, input)
+	err = database.SaveEmbeddingToRedis(ctx, chatCompletion, vector, input)
 
 	if err != nil {
 		log.Fatalf("Error storing the response to Redis %v", err)
 		return
 	}
 
-	latencyMs := int32(time.Since(startTime).Microseconds())
+	latencyMs := int32(time.Since(startTime).Abs().Milliseconds())
 
 	err = database.SaveResponseToPostgres(ctx, chatCompletion, input, latencyMs)
 

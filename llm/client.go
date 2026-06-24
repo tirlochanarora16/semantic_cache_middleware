@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -21,4 +22,16 @@ func NewClient() (*openai.Client, error) {
 	)
 
 	return &client, nil
+}
+
+func CheckOpenAI(ctx context.Context, client *openai.Client) error {
+	if client == nil {
+		return fmt.Errorf("OpenAI client is not initalized")
+	}
+
+	if _, err := client.Models.List(ctx); err != nil {
+		return fmt.Errorf("OpenAI startup check failed: %w", err)
+	}
+
+	return nil
 }
