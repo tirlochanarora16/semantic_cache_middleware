@@ -24,6 +24,13 @@ func main() {
 		return
 	}
 
+	err = database.EnsureVectorIndex(context.Background())
+
+	if err != nil {
+		log.Fatalf("Error creating vector index in redis %v", err)
+		return
+	}
+
 	pool, err := database.InitializePostgresDB()
 
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +42,40 @@ func InitializeRedisDB() error {
 	redisClient = client
 
 	return nil
+}
+
+func EnsureVectorIndex(ctx context.Context) error {
+	_, err := redisClient.Do(ctx, "FT.INFO", "idx:cache").Result()
+
+	if err == nil {
+		return nil
+	}
+
+	if !strings.Contains(err.Error(), "No such index") && !strings.Contains(err.Error(), "Unknown index name") {
+		return err
+	}
+
+	_, err = redisClient.Do(
+		ctx,
+		"FT.CREATE",
+		"idx:cache",
+		"ON", "HASH",
+		"PREFIX", "1", "cache:",
+		"SCHEMA",
+		"prompt", "TEXT",
+		"response", "TEXT",
+		"created_at", "NUMERIC",
+		"embedding", "VECTOR", "HNSW", "6",
+		"TYPE", "FLOAT32",
+		"DIM", "1536",
+		"DISTANCE_METRIC", "COSINE",
+	).Result()
+
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 func DoVectorSearch(ctx context.Context, vectorBytes []byte) (*VectorSearchResult, error) {
@@ -82,7 +117,7 @@ func DoVectorSearch(ctx context.Context, vectorBytes []byte) (*VectorSearchResul
 		case "response":
 			out.Response = value
 		case "score":
-			if score, err := strconv.ParseFloat(value, 64); err != nil {
+			if score, err := strconv.ParseFloat(value, 64); err == nil {
 				out.Score = score
 			}
 		}
