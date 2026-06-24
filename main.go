@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"time"
 
+	"example.com/api"
 	"example.com/database"
 	"example.com/llm"
 	"github.com/joho/godotenv"
@@ -57,6 +59,22 @@ func main() {
 	log.Println("All Startup checks passed")
 
 	aiService := llm.NewClientService(client)
-	aiService.RunAllServices(context.Background())
+	handler := api.NewHandler(aiService)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /v1/generate", handler.Generate)
+
+	server := &http.Server{
+		Addr:              ":3000",
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	log.Println("HTTP server listening on port 3000")
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("HTTP server failed: %v", err)
+	}
 
 }

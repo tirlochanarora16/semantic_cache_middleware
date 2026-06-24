@@ -9,12 +9,17 @@ import (
 	"time"
 
 	"example.com/database"
-	"example.com/helpers"
 	"github.com/openai/openai-go/v3"
 )
 
 type ClientService struct {
 	client *openai.Client
+}
+
+type PromptResult struct {
+	Response        string
+	CacheHit        bool
+	SimilarityScore float64
 }
 
 const similarityThreshold = 0.08
@@ -25,66 +30,63 @@ func NewClientService(client *openai.Client) *ClientService {
 	}
 }
 
-func (s *ClientService) RunAllServices(ctx context.Context) {
-	// get input from the user
-	input, err := helpers.GetUserInput()
+func (s *ClientService) ProcessPrompt(ctx context.Context, input string) (*PromptResult, error) {
+	requestStartedAt := time.Now()
 
-	if err != nil {
-		log.Fatalf("Error connecting to Redis %v", err)
-		return
-	}
-
-	// convert the input into embeddings
 	vector, err := s.GenerateInputEmbeddings(ctx, input)
 
 	if err != nil {
-		log.Fatalf("Error generating vector embedding for the input %v", err)
-		return
+		return nil, fmt.Errorf("generate embedding: %w", err)
 	}
 
 	// search redis for similarity search
 	searchResp, err := s.SimilaritySearch(ctx, vector)
 
 	if err != nil {
-		log.Fatalf("Error getting the response from Redis %v", err)
-		return
+		return nil, fmt.Errorf("serach cache error: %w", err)
 	}
 
 	if searchResp.Found && searchResp.Score <= similarityThreshold {
-		// get the response from the Redis DB
-		fmt.Println(searchResp.Response)
-		return
+		log.Printf("cache hit distance=%f total_latency_ms=%d", searchResp.Score, time.Since(requestStartedAt).Milliseconds())
+		return &PromptResult{
+			Response:        searchResp.Response,
+			CacheHit:        true,
+			SimilarityScore: searchResp.Score,
+		}, nil
 	}
 
-	startTime := time.Now()
+	if searchResp.Found {
+		log.Printf("cache miss nearest_distance=%f", searchResp.Score)
+	} else {
+		log.Printf("cache miss nearest_distance=none")
+	}
+
+	startedAt := time.Now()
 
 	// hit OpenAI to get the response
-	chatCompletion, err := s.GetAiResponse(ctx, input)
+	completion, err := s.GetAiResponse(ctx, input)
 
 	if err != nil {
-		log.Fatalf("Error getting the response from Open AI %v", err)
-		return
+		return nil, fmt.Errorf("error getting AI response %w", err)
 	}
 
-	err = database.SaveEmbeddingToRedis(ctx, chatCompletion, vector, input)
+	response := completion.Choices[0].Message.Content
+	latencyMs := int32(time.Since(startedAt).Milliseconds())
 
-	if err != nil {
-		log.Fatalf("Error storing the response to Redis %v", err)
-		return
+	if err := database.SaveResponseToPostgres(ctx, completion, input, latencyMs); err != nil {
+		return nil, fmt.Errorf("save response to postgres %w", err)
 	}
 
-	latencyMs := int32(time.Since(startTime).Abs().Milliseconds())
-
-	err = database.SaveResponseToPostgres(ctx, chatCompletion, input, latencyMs)
-
-	if err != nil {
-		log.Fatalf("Error storing the response to Postgres %v", err)
-		return
+	if err := database.SaveEmbeddingToRedis(ctx, completion, vector, input); err != nil {
+		return nil, fmt.Errorf("save response to redis: %w", err)
 	}
 
-	fmt.Println(chatCompletion.Choices[0].Message.Content)
+	log.Printf("llm response saved total_latency_ms=%d llm_latency_ms=%d", time.Since(requestStartedAt).Milliseconds(), latencyMs)
 
-	// save the complete data to postgres and redis
+	return &PromptResult{
+		Response: response,
+		CacheHit: false,
+	}, nil
 }
 
 func (s *ClientService) GenerateInputEmbeddings(ctx context.Context, input string) ([]float64, error) {
