@@ -14,8 +14,8 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatalf("Error loading env variables variables %v", err)
-		return
+		// to work seemlessly in docker container
+		log.Println("No .env file found, using environment variables")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)

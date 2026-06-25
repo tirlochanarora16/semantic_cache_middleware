@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS llm_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     prompt TEXT NOT NULL,

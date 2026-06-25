@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -54,6 +55,17 @@ func (h *Handler) Generate(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.ProcessPrompt(ctx, request.Prompt)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			log.Printf("generate request canceled by client: %v", err)
+			return
+		}
+
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("generate request timed out: %v", err)
+			http.Error(w, "request timed out", http.StatusGatewayTimeout)
+			return
+		}
+
 		log.Printf("generate request failed: %v", err)
 		http.Error(w, "unable to generate response", http.StatusInternalServerError)
 		return
